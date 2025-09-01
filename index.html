@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador Booleano</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+        .snackbar {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px;
+            color: white;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            z-index: 1000;
+        }
+        .snackbar.show {
+            opacity: 1;
+        }
+        .snackbar.success {
+            background-color: #22c55e;
+        }
+        .snackbar.warning {
+            background-color: #f97316;
+        }
+        .snackbar.error {
+            background-color: #ef4444;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+<div class="max-w-md w-full bg-white rounded-xl shadow-lg p-6 md:p-8">
+    <!-- Header -->
+    <div class="flex items-center justify-center mb-6">
+        <div class="flex-shrink-0 mr-4">
+            <span class="material-icons text-blue-500 text-4xl">cloud_upload</span>
+        </div>
+        <h1 class="text-3xl font-bold text-gray-900">Generador Booleano</h1>
+    </div>
+
+    <!-- Dropzone y Botón -->
+    <div class="mb-6">
+        <p class="text-center text-gray-600 mb-2">Sube tu archivo .xlsx</p>
+        <div id="dropzone" class="border-2 border-dashed border-gray-400 rounded-lg p-8 text-center cursor-pointer transition-colors duration-300 hover:border-blue-500">
+            <input id="file-input" type="file" accept=".xlsx" class="hidden" onchange="handleFileChange(event)">
+            <span class="material-icons text-gray-500 text-5xl">cloud_upload</span>
+            <p id="file-name" class="text-sm text-gray-500 mt-2">Arrastra y suelta un archivo o haz clic para subirlo</p>
+        </div>
+        <div id="progress-bar" class="w-full bg-gray-200 rounded-full h-2.5 mt-4 overflow-hidden hidden">
+            <div class="bg-blue-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+    </div>
+    
+    <button id="process-button" class="w-full bg-blue-500 text-white font-bold py-3 rounded-full shadow-lg transition-colors duration-300 hover:bg-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed">
+        Procesar archivo
+    </button>
+    
+    <!-- Resultados -->
+    <div id="results-container" class="mt-8 hidden">
+        <h2 class="text-xl font-bold mb-4">Resultados</h2>
+        <div id="log-container" class="bg-gray-50 rounded-lg p-4 mb-4 text-sm text-gray-700 hidden"></div>
+        <div class="flex justify-end mb-4">
+            <button id="copy-all-button" class="bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-full transition-colors duration-300 hover:bg-gray-300">
+                Copiar todas las búsquedas
+            </button>
+        </div>
+        <div id="searches-list"></div>
+    </div>
+</div>
+
+<!-- Snackbar -->
+<div id="snackbar" class="snackbar"></div>
+
+<script>
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('file-input');
+    const fileNameDisplay = document.getElementById('file-name');
+    const processButton = document.getElementById('process-button');
+    const progressBar = document.getElementById('progress-bar');
+    const progressBarFill = progressBar.querySelector('div');
+    const resultsContainer = document.getElementById('results-container');
+    const searchesList = document.getElementById('searches-list');
+    const copyAllButton = document.getElementById('copy-all-button');
+    const snackbarElement = document.getElementById('snackbar');
+    const logContainer = document.getElementById('log-container');
+
+    let file = null;
+
+    const validPlatforms = {
+        'twitter': { code: 'TW', color: '#1da1f2' },
+        'facebook': { code: 'FB', color: '#3b5998' },
+        'instagram': { code: 'IG', color: '#c90a88' },
+        'tiktok': { code: 'TK', color: '#00f2ea' }
+    };
+
+    function showSnackbar(message, severity) {
+        snackbarElement.textContent = message;
+        snackbarElement.className = `snackbar show ${severity}`;
+        setTimeout(() => {
+            snackbarElement.classList.remove('show');
+        }, 3000);
+    }
+
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('border-blue-500');
+    });
+    dropzone.addEventListener('dragleave', () => {
+        dropzone.classList.remove('border-blue-500');
+    });
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('border-blue-500');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFile(files[0]);
+        }
+    });
+
+    function handleFileChange(event) {
+        const files = event.target.files;
+        if (files.length > 0) {
+            handleFile(files[0]);
+        }
+    }
+
+    function handleFile(selectedFile) {
+        if (selectedFile.name.endsWith('.xlsx')) {
+            file = selectedFile;
+            fileNameDisplay.textContent = selectedFile.name;
+            processButton.disabled = false;
+            showSnackbar('Archivo seleccionado con éxito.', 'success');
+        } else {
+            file = null;
+            fileNameDisplay.textContent = 'Formato de archivo inválido. Sube un .xlsx';
+            processButton.disabled = true;
+            showSnackbar('Por favor, selecciona un archivo .xlsx.', 'warning');
+        }
+    }
+
+    processButton.addEventListener('click', async () => {
+        if (!file) {
+            showSnackbar('Por favor, selecciona un archivo .xlsx.', 'warning');
+            return;
+        }
+
+        processButton.textContent = 'Procesando...';
+        processButton.disabled = true;
+        progressBar.classList.remove('hidden');
+        resultsContainer.classList.add('hidden');
+        searchesList.innerHTML = '';
+        logContainer.classList.add('hidden');
+
+        try {
+            const data = await readFileAsArrayBuffer(file);
+            progressBarFill.style.width = '25%';
+
+            const workbook = XLSX.read(data, { type: 'array' });
+            progressBarFill.style.width = '50%';
+
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            progressBarFill.style.width = '75%';
+
+            const { searches, totalRows, ignoredRowsDetails } = await processData(json);
+            
+            progressBarFill.style.width = '100%';
+
+            if (searches.length > 0) {
+                renderSearches(searches, totalRows, ignoredRowsDetails);
+                showSnackbar('Archivo procesado correctamente.', 'success');
+                resultsContainer.classList.remove('hidden');
+            } else {
+                showSnackbar('El archivo no contiene datos válidos para generar búsquedas.', 'warning');
+            }
+        } catch (error) {
+            showSnackbar(`Error: ${error.message}`, 'error');
+        } finally {
+            processButton.textContent = 'Procesar archivo';
+            processButton.disabled = false;
+            progressBar.classList.add('hidden');
+            progressBarFill.style.width = '0%';
+        }
+    });
+
+    function readFileAsArrayBuffer(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(new Uint8Array(e.target.result));
+            reader.onerror = (err) => reject(err);
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    function processData(data) {
+        return new Promise((resolve, reject) => {
+            if (data.length <= 1) {
+                resolve({ searches: [], totalRows: 0, ignoredRowsDetails: [] });
+                return;
+            }
+            const normalizeHeader = (header) => {
+                if (!header) return '';
+                return header.toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split('(')[0].trim();
+            };
+        
+            const headers = data[0].map(normalizeHeader);
+            const dataRows = data.slice(1);
+            
+            const requiredHeadersMap = {
+                'date': ['date', 'fecha de publicacion'],
+                'platform': ['platform', 'red social'],
+                'content': ['content', 'texto del post'],
+                'view on platform': ['view on platform', 'enlace del post'],
+            };
+            const headerIndices = {};
+            
+            try {
+                for (const userHeader in requiredHeadersMap) {
+                    const possibleHeaders = requiredHeadersMap[userHeader];
+                    let foundIndex = -1;
+                    for (const possibleHeader of possibleHeaders) {
+                        const normalizedPossibleHeader = normalizeHeader(possibleHeader);
+                        const index = headers.indexOf(normalizedPossibleHeader);
+                        if (index !== -1) {
+                            foundIndex = index;
+                            break;
+                        }
+                    }
+                    if (foundIndex === -1) {
+                        throw new Error(`Columna requerida "${userHeader}" no encontrada.`);
+                    }
+                    headerIndices[userHeader] = foundIndex;
+                }
+            } catch (error) {
+                reject(error);
+                return;
+            }
+            
+            const finalOutput = [];
+            const ignoredRowsDetails = [];
+            for (let i = 0; i < dataRows.length; i++) {
+                const row = dataRows[i];
+                const rowNumber = i + 2;
+                
+                const platform = row[headerIndices['platform']]?.toString().toLowerCase().trim() || '';
+                const validPlatform = validPlatforms[platform];
+                if (!validPlatform) {
+                    ignoredRowsDetails.push({ row: rowNumber, reason: `Plataforma "${platform || 'vacía'}" no válida.` });
+                    continue;
+                }
+
+                const dateValue = row[headerIndices['date']];
+                let dateStr = '';
+                if (typeof dateValue === 'number') {
+                    const excelDate = new Date(Date.UTC(0, 0, dateValue - 1));
+                    dateStr = `${String(excelDate.getUTCDate()).padStart(2, '0')}/${String(excelDate.getUTCMonth() + 1).padStart(2, '0')}/${excelDate.getUTCFullYear()}`;
+                } else if (typeof dateValue === 'string') {
+                    const dateRegexes = [
+                        /^(\d{2}\/\d{2}\/\d{4})/,
+                        /^(\d{2}-\d{2}-\d{4})/,
+                        /^(\d{4}-\d{2}-\d{2})/
+                    ];
+                    let match = null;
+                    for (const regex of dateRegexes) {
+                        match = dateValue.match(regex);
+                        if (match) break;
+                    }
+                    if (match) {
+                        dateStr = match[1].replace(/-/g, '/');
+                    }
+                }
+
+                if (!dateStr) {
+                    ignoredRowsDetails.push({ row: rowNumber, reason: 'Formato de fecha incorrecto.' });
+                    continue;
+                }
+
+                const url = row[headerIndices['view on platform']]?.toString().trim() || '';
+                const content = row[headerIndices['content']]?.toString().trim() || '';
+                
+                let identifier = "";
+                if (platform === 'twitter' || platform === 'tiktok') {
+                    const match = url.match(/\/(\d+)/);
+                    if (match) {
+                        identifier = `engagingWithGuid:${match[1]}`;
+                    }
+                } else if (platform === 'facebook') {
+                    const match = url.match(/(_(\d+)|posts\/(\d+)|(videos|photos)\/(\d+))/);
+                    if (match) {
+                        identifier = `engagingWithGuid:${match[2] || match[3] || match[5]}`;
+                    }
+                } else if (platform === 'instagram') {
+                    const match = url.match(/\/(p|reel|tv)\/([a-zA-Z0-9_-]+)/);
+                    if (match) {
+                        identifier = `url:${match[2]}`;
+                    }
+                }
+
+                if (!identifier) {
+                    ignoredRowsDetails.push({ row: rowNumber, reason: 'URL o identificador no válido.' });
+                    continue;
+                }
+
+                const words = content.trim().split(/\s+/);
+                const phrase = words.slice(0, 6).join(" ");
+                const keyPhrase = `title:"${phrase}"`;
+                
+                finalOutput.push({ date: dateStr, platform: validPlatform.code, keyPhrase, identifier });
+            }
+
+            resolve({ searches: finalOutput, totalRows: dataRows.length, ignoredRowsDetails });
+        });
+    }
+
+    function renderSearches(searches, totalRows, ignoredRowsDetails) {
+        searchesList.innerHTML = '';
+        localStorage.setItem('searches', JSON.stringify(searches));
+
+        const groupedByDate = searches.reduce((acc, search) => {
+            const date = search.date;
+            if (!acc[date]) {
+                acc[date] = [];
+            }
+            acc[date].push(search);
+            return acc;
+        }, {});
+        const groupedSearchesCount = Object.keys(groupedByDate).length;
+        const generatedSearches = searches.length;
+        const ignoredRows = totalRows - generatedSearches;
+
+        let logHtml = `<p><strong>El archivo contenía:</strong> ${totalRows} filas de datos.</p>`;
+        logHtml += `<p><strong>Se generaron:</strong> ${generatedSearches} búsquedas.</p>`;
+        if (ignoredRows > 0) {
+            logHtml += `<p><strong>Comentarios:</strong></p>`;
+            logHtml += `<ul>`;
+            ignoredRowsDetails.forEach(detail => {
+                logHtml += `<li>- Fila #${detail.row}: ${detail.reason}</li>`;
+            });
+            logHtml += `</ul>`;
+        } else {
+            logHtml += `<p><strong>Se ignoraron:</strong> ${ignoredRows} filas.</p>`;
+        }
+        
+        logHtml += `<p><strong>Se agruparon:</strong> ${groupedSearchesCount} búsquedas por fecha.</p>`;
+
+        logContainer.innerHTML = logHtml;
+        logContainer.classList.remove('hidden');
+
+        searches.forEach((search, index) => {
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-lg shadow-md p-4 mb-4';
+            card.innerHTML = `
+                <div class="flex items-start justify-between">
+                    <div class="flex-grow">
+                        <p class="text-sm font-semibold text-blue-700">Post ${search.date} [${search.platform}]</p>
+                        <p class="mt-1 text-gray-800">${search.keyPhrase} OR ${search.identifier}</p>
+                    </div>
+                    <button class="copy-button ml-4 text-gray-500 hover:text-blue-500 transition-colors duration-200">
+                        <span class="material-icons">content_copy</span>
+                    </button>
+                </div>
+            `;
+            const copyButton = card.querySelector('.copy-button');
+            copyButton.addEventListener('click', () => {
+                const textToCopy = `<<<Post ${search.date} ${search.platform}>>>\n${search.keyPhrase} OR ${search.identifier}`;
+                copyTextToClipboard(textToCopy);
+            });
+            searchesList.appendChild(card);
+            if (index < searches.length - 1) {
+                const orDiv = document.createElement('div');
+                orDiv.className = 'text-center text-gray-400 font-bold my-2';
+                orDiv.textContent = 'OR';
+                searchesList.appendChild(orDiv);
+            }
+        });
+    }
+
+    function copyTextToClipboard(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    showSnackbar('Búsqueda copiada al portapapeles.', 'success');
+                })
+                .catch(err => {
+                    fallbackCopyTextToClipboard(text);
+                });
+        } else {
+            fallbackCopyTextToClipboard(text);
+        }
+    }
+
+    function fallbackCopyTextToClipboard(text) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+                showSnackbar('Búsqueda copiada al portapapeles (método de reserva).', 'success');
+            } else {
+                showSnackbar('Error al copiar la búsqueda.', 'error');
+            }
+        } catch (err) {
+            showSnackbar('Error al copiar la búsqueda.', 'error');
+        }
+        document.body.removeChild(textArea);
+    }
+
+
+    copyAllButton.addEventListener('click', () => {
+        const searches = JSON.parse(localStorage.getItem('searches') || '[]');
+        if (searches.length === 0) {
+            showSnackbar('No hay búsquedas para copiar.', 'warning');
+            return;
+        }
+
+        const groupedByDate = searches.reduce((acc, search) => {
+            const date = search.date;
+            if (!acc[date]) {
+                acc[date] = [];
+            }
+            acc[date].push(search);
+            return acc;
+        }, {});
+
+        const formattedGroups = [];
+        for (const date in groupedByDate) {
+            const searchesForDate = groupedByDate[date];
+            const platform = searchesForDate[0].platform; 
+            const searchParts = searchesForDate.map(s => `${s.keyPhrase} OR ${s.identifier}`);
+            formattedGroups.push(`<<<Post ${date} ${platform}>>>\n${searchParts.join(' OR ')}`);
+        }
+        
+        const allSearchesText = formattedGroups.join('\nOR\n');
+        copyTextToClipboard(allSearchesText);
+    });
+</script>
+
+</body>
+</html>
