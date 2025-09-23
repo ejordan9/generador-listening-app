@@ -44,12 +44,23 @@
 
 <div class="max-w-md w-full bg-white rounded-xl shadow-lg p-6 md:p-8">
     <!-- Header -->
-    <div class="flex items-center justify-center mb-6">
+    <div class="flex items-center justify-center mb-2">
         <div class="flex-shrink-0 mr-4">
             <span class="material-icons text-blue-500 text-4xl">cloud_upload</span>
         </div>
         <h1 class="text-3xl font-bold text-gray-900">Generador Booleano</h1>
     </div>
+
+    <!-- Descripción de Columnas -->
+    <p class="text-center text-gray-600 mb-4 text-sm">
+        Tu archivo Excel debe contener las siguientes columnas para su correcto funcionamiento.
+    </p>
+    <ul class="text-left text-gray-700 text-xs list-disc list-inside mb-6 space-y-1">
+        <li><strong>Fecha de publicación</strong> (o <strong>Date</strong>): Contiene la fecha del post.</li>
+        <li><strong>Red social</strong> (o <strong>Platform</strong>): Contiene la plataforma ("twitter", "facebook", "instagram", o "tiktok").</li>
+        <li><strong>Texto del post</strong> (o <strong>Content</strong>): Contiene el texto del post.</li>
+        <li><strong>Enlace del post</strong> (o <strong>View on platform</strong>): Contiene el URL del post.</li>
+    </ul>
 
     <!-- Dropzone y Botón -->
     <div class="mb-6">
