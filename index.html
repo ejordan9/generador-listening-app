@@ -380,8 +380,11 @@
         const groupedSearchesCount = Object.keys(groupedByDate).length;
         const generatedSearches = searches.length;
         const totalIgnored = totalRows - generatedSearches;
+        const dataRows = totalRows - 1;
+        const processedRows = generatedSearches;
 
-        let logHtml = `<p><strong>El archivo contenía:</strong> ${totalRows} filas de datos.</p>`;
+        let logHtml = `<p><strong>El archivo contenía:</strong> ${dataRows} filas de datos.</p>`;
+        logHtml += `<p><strong>Filas con datos:</strong> ${processedRows}</p>`;
         logHtml += `<p><strong>Se generaron:</strong> ${generatedSearches} búsquedas.</p>`;
         if (totalIgnored > 0) {
             logHtml += `<p><strong>Se ignoraron:</strong> ${totalIgnored} filas por los siguientes motivos:</p>`;
