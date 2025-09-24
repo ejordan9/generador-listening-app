@@ -263,15 +263,32 @@
             }
             
             const finalOutput = [];
-            const ignoredRowsDetails = [];
+            const ignoredRowsDetails = {}; // Usar un objeto para agrupar errores
+            let totalIgnoredCount = 0;
+
             for (let i = 0; i < dataRows.length; i++) {
                 const row = dataRows[i];
                 const rowNumber = i + 2;
-                
+
                 const platform = row[headerIndices['platform']]?.toString().toLowerCase().trim() || '';
+                if (!platform) {
+                    const reason = 'Plataforma "vacía"';
+                    if (!ignoredRowsDetails[reason]) {
+                        ignoredRowsDetails[reason] = { count: 0, sampleRow: rowNumber };
+                    }
+                    ignoredRowsDetails[reason].count++;
+                    totalIgnoredCount++;
+                    continue;
+                }
+                
                 const validPlatform = validPlatforms[platform];
                 if (!validPlatform) {
-                    ignoredRowsDetails.push({ row: rowNumber, reason: `Plataforma "${platform || 'vacía'}" no válida.` });
+                    const reason = `Plataforma "${platform}" no válida`;
+                    if (!ignoredRowsDetails[reason]) {
+                        ignoredRowsDetails[reason] = { count: 0, sampleRow: rowNumber };
+                    }
+                    ignoredRowsDetails[reason].count++;
+                    totalIgnoredCount++;
                     continue;
                 }
 
@@ -297,7 +314,12 @@
                 }
 
                 if (!dateStr) {
-                    ignoredRowsDetails.push({ row: rowNumber, reason: 'Formato de fecha incorrecto.' });
+                    const reason = 'Formato de fecha incorrecto';
+                    if (!ignoredRowsDetails[reason]) {
+                        ignoredRowsDetails[reason] = { count: 0, sampleRow: rowNumber };
+                    }
+                    ignoredRowsDetails[reason].count++;
+                    totalIgnoredCount++;
                     continue;
                 }
 
@@ -323,7 +345,12 @@
                 }
 
                 if (!identifier) {
-                    ignoredRowsDetails.push({ row: rowNumber, reason: 'URL o identificador no válido.' });
+                    const reason = 'URL o identificador no válido';
+                    if (!ignoredRowsDetails[reason]) {
+                        ignoredRowsDetails[reason] = { count: 0, sampleRow: rowNumber };
+                    }
+                    ignoredRowsDetails[reason].count++;
+                    totalIgnoredCount++;
                     continue;
                 }
 
@@ -352,19 +379,17 @@
         }, {});
         const groupedSearchesCount = Object.keys(groupedByDate).length;
         const generatedSearches = searches.length;
-        const ignoredRows = totalRows - generatedSearches;
+        const totalIgnored = totalRows - generatedSearches;
 
         let logHtml = `<p><strong>El archivo contenía:</strong> ${totalRows} filas de datos.</p>`;
         logHtml += `<p><strong>Se generaron:</strong> ${generatedSearches} búsquedas.</p>`;
-        if (ignoredRows > 0) {
-            logHtml += `<p><strong>Comentarios:</strong></p>`;
+        if (totalIgnored > 0) {
+            logHtml += `<p><strong>Se ignoraron:</strong> ${totalIgnored} filas por los siguientes motivos:</p>`;
             logHtml += `<ul>`;
-            ignoredRowsDetails.forEach(detail => {
-                logHtml += `<li>- Fila #${detail.row}: ${detail.reason}</li>`;
-            });
+            for (const reason in ignoredRowsDetails) {
+                logHtml += `<li>- ${ignoredRowsDetails[reason].count} filas: ${reason}. (Ejemplo en fila #${ignoredRowsDetails[reason].sampleRow})</li>`;
+            }
             logHtml += `</ul>`;
-        } else {
-            logHtml += `<p><strong>Se ignoraron:</strong> ${ignoredRows} filas.</p>`;
         }
         
         logHtml += `<p><strong>Se agruparon:</strong> ${groupedSearchesCount} búsquedas por fecha.</p>`;
@@ -430,7 +455,7 @@
                 showSnackbar('Error al copiar la búsqueda.', 'error');
             }
         } catch (err) {
-            showSnackbar('Error al copiar la búsqueda.', 'error');
+                showSnackbar('Error al copiar la búsqueda.', 'error');
         }
         document.body.removeChild(textArea);
     }
